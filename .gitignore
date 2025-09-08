@@ -3,5 +3,6 @@ dist
 run.spec
 run
 venv
-*key.txt
+*.txt
+!requirements.txt
 #remove run from ignore list when ready to ship
