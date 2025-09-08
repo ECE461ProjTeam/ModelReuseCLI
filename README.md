@@ -1,5 +1,7 @@
 # A CLI for Trustworthy Pre-Trained Model Re-Use
 
+## Setup
+Put your Gemini-2.0-flash API key into gemini_key.txt
 
 ## Usage
 Run ```make package``` to generate executable
