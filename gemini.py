@@ -10,7 +10,7 @@ def prompt_gemini(prompt, api_key):
         api_key (str): Gemini API key
     
     Returns:
-        dict: The API response
+        generated_text (str): Gemini's response
     """
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     
@@ -35,7 +35,9 @@ def prompt_gemini(prompt, api_key):
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         
-        return response.json()
+        generated_text = response.json()['candidates'][0]['content']['parts'][0]['text']
+        
+        return generated_text
     
     except requests.exceptions.RequestException as e:
         print(f"Request error: {e}")
@@ -48,14 +50,13 @@ if __name__ == "__main__":
     with open('gemini_key.txt', 'r') as file:
         GEMINI_API_KEY = file.readline().strip()
     
-    prompt_text = "How do you evaluate an AI model's size?"
+    prompt_text = "How do you say Hi in French?"
     
-    result = prompt_gemini(GEMINI_API_KEY, prompt_text)
+    result = prompt_gemini(prompt_text, GEMINI_API_KEY)
     
     if result:
         try:
-            generated_text = result['candidates'][0]['content']['parts'][0]['text']
-            print(f"\nGenerated Response: {generated_text}")
+            print(f"\nGenerated Response: {result}")
         except (KeyError, IndexError) as e:
             print(f"Error extracting response: {e}")
     else:
