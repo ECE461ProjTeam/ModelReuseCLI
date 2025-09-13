@@ -9,11 +9,10 @@ Optionally, set up a Hugging Face token for higher rate limits:
 - To avoid OS permission issues with Hugging Face, set a project-local cache
 
 ## Usage
-Run ```make package``` to generate executable
-
-Then run ```./run install``` to install dependencies or ```./run URL_FILE``` where URL_FILE is filepath to list of URLs
+Run ```./run install``` to install dependencies or ```./run URL_FILE``` where URL_FILE is filepath to list of URLs
 
 ## Contributors
 - Mikhail Golovenchits
 - Vatsal Dudhaiya
 - Murad Ibrahimov
+- Jake Scherer
