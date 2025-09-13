@@ -2,6 +2,7 @@
   "name": "modelreusecli",
   "version": "1.0.0",
   "description": "Put your Gemini-2.0-flash API key into gemini_key.txt",
+  "type": "module",
   "main": "index.js",
   "directories": {
     "doc": "docs"
