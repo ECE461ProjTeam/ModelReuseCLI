@@ -1,8 +1,9 @@
 import requests
 import json
+from typing import Optional
 
 
-def prompt_gemini(prompt, api_key):
+def prompt_gemini(prompt: str, api_key: str) -> Optional[str]:
     """
     Make a request to Google's Gemini API to generate responses based on a text prompt.
 

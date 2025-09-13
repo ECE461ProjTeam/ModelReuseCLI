@@ -36,12 +36,12 @@ class Dataset:
         return self._metadata
     def getPathToCloned(self) -> str:
         return self._path_to_cloned
-    def getCodeQuality(self) -> int:
-        return self._code_quality
+    def getDatasetQuality(self) -> int:
+        return self._dataset_quality
     
 
 class Model:
-    def __init__(self, url: str):
+    def __init__(self, url: str) -> None:
         self.url = url
         self.name: str = ""
         self.code = None  # instance of Code class
@@ -52,7 +52,7 @@ class Model:
         self.hfAPIData = {}
         self.gitAPIData = {}
 
-    def calcMetricsParallel(self) -> dict:
+    def calcMetricsParallel(self) -> None:
         threads = []
         funcs = {"ramp_up_time": self.calcRampUp, "bus_factor": self.calcBusFactor, 
                  "performance_claims": self.calcPerformanceClaims, "license": self.calcLicense, 
