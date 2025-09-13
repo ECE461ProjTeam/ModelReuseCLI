@@ -1,7 +1,8 @@
 #!/bin/bash
 
 if [ "$1" == "install" ]; then
-    pip install -r requirements.txt
-    exit $?
+    pip install -r requirements.txt || exit $?
+    npm install || exit $?
+    exit 0
 fi
 python3 main.py "$@" 

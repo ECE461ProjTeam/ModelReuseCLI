@@ -6,4 +6,5 @@ __pycache__/
 .hf_home/
 *.txt
 !requirements.txt
+node_modules
 #remove run from ignore list when ready to ship
