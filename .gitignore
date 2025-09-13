@@ -1,8 +1,9 @@
-build
-dist
-run.spec
-run
 venv
+.venv/
+__pycache__/
+.pytest_cache/
+.DS_Store
+.hf_home/
 *.txt
 !requirements.txt
 #remove run from ignore list when ready to ship

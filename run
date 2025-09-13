@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ "$1" == "install" ]; then
+    pip install -r requirements.txt
+    exit $?
+fi
+python3 main.py "$@" 
