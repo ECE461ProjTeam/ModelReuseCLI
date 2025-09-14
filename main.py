@@ -2,12 +2,13 @@
 import argparse
 import sys
 import os
+from typing import Dict
 
 from apis.gemini import prompt_gemini
 from apis.hf_client import HFClient, resolve_hf_token
 
 
-def get_api_keys():
+def get_api_keys() -> Dict[str, str]:
     """
     Compile all available API keys into a dictionary.
 
@@ -34,7 +35,7 @@ def get_api_keys():
 
 def main():
     parser = argparse.ArgumentParser(description="ModelReuseCLI main entry point")
-    parser.add_argument('option', type=str, help="'install', 'hf-test', or URL_FILE")
+    parser.add_argument('option', type=str, help="'install', 'test', or URL_FILE")
     args = parser.parse_args()
 
     if args.option == "test":
