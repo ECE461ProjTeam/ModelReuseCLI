@@ -1,6 +1,7 @@
 import threading
 import time
-
+from metrics.size_score import size_score
+import json
 class Code:
     def __init__(self, url: str) -> None:
         self._url = url
@@ -41,13 +42,14 @@ class Dataset:
     
 
 class Model:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str = "", id: str = "") -> None:
         self.url = url
-        self.name: str = ""
+        self.id: str = id
         self.code = None  # instance of Code class
         self.dataset = None  # instance of Dataset class
         self.metadata = {}
         self.metrics = {"ramp_up_time": 0, "bus_factor": 0, "performance_claims": 0, "license": 0, "size_score": 0, "dataset_and_code_score": 0, "dataset_quality": 0, "code_quality": 0}
+        self.latencies = {"ramp_up_time_latency": 0, "bus_factor_latency": 0, "performance_claims_latency": 0, "license_latency": 0, "size_score_latency": 0, "dataset_and_code_score_latency": 0, "dataset_quality_latency": 0, "code_quality_latency": 0}
         self.netScore = 0.0
         self.hfAPIData = {}
         self.gitAPIData = {}
@@ -68,7 +70,9 @@ class Model:
             t.join()
     
     def calcSize(self) -> None:
-        self.metrics["size_score"] = 1
+        t = time.time()
+        self.metrics["size_score"] = size_score(self.id)
+        self.latencies["size_score_latency"] = time.time() - t
 
     def calcRampUp(self) -> None:
         self.metrics["ramp_up_time"] = 1
@@ -96,9 +100,11 @@ class Model:
     
 
 if __name__ == "__main__":
-    model = Model("url")
-    t = time.time()
+    model = Model(id = "deepseek-ai/DeepSeek-R1")
     model.calcMetricsParallel()
-    print(model.metrics)
-    print(time.time() - t)
+    output = {}
+    output.update(model.metrics)
+    output.update(model.latencies)
+
+    print(json.dumps(output, indent=4))
     
