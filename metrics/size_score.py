@@ -10,9 +10,9 @@ def size_score(model_id: str) -> Dict[str, float]:
     """Calculate a size-based score for a given model.
 
     Args:
-        model_name (str): The name of the model to evaluate.
+        model_id (str): The id of the model to evaluate.
     Returns:
-        float: A score between 0 and 1 based on the model's size.
+        dict: A score between 0 and 1 based on the model's size & platform.
     """
     client = HFClient()
     model_info = client.model_info(model_id)
