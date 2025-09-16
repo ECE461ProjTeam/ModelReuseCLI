@@ -16,7 +16,7 @@ def bus_factor(owner: str, repo: str) -> float:
         repo (str): The repository identifier.
 
     Returns:
-        int: The bus factor of the repository. [0-1]
+        float: The bus factor of the repository. [0-1]
     """
     contributors = git_api.get_contributors(owner, repo)
     if not contributors:
