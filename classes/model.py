@@ -47,7 +47,21 @@ class Model:
         self.code = None  # instance of Code class
         self.dataset = None  # instance of Dataset class
         self.metadata = {}
-        self.metrics = {"ramp_up_time": 0, "bus_factor": 0, "performance_claims": 0, "license": 0, "size_score": 0, "dataset_and_code_score": 0, "dataset_quality": 0, "code_quality": 0}
+        self.metrics = {
+            "ramp_up_time": 0, 
+            "bus_factor": 0, 
+            "performance_claims": 0, 
+            "license": 0, 
+            "size_score": {
+                "raspberry_pi": 0.0,
+                "jetson_nano": 0.0,
+                "desktop_pc": 0.0,
+                "aws_server": 0.0
+            }, 
+            "dataset_and_code_score": 0, 
+            "dataset_quality": 0, 
+            "code_quality": 0
+        }
         self.netScore = 0.0
         self.hfAPIData = {}
         self.gitAPIData = {}
@@ -93,6 +107,9 @@ class Model:
 
     def linkCode(self, code: Code):
         self.code = code
+    
+    def linkDataset(self, dataset: Dataset):
+        self.dataset = dataset
     
 
 if __name__ == "__main__":

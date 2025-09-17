@@ -15,6 +15,17 @@ Optionally, set up a Hugging Face token for higher rate limits:
 ## Usage
 Run ```./run install``` to install dependencies or ```./run URL_FILE``` where URL_FILE is filepath to list of URLs
 
+## Testing URL Parsing
+To test the URL parsing functionality, create a text file with CSV format:
+```
+<code_link_1>, <dataset_link_1>,<model_link_1>
+<code_link_2>, <dataset_link_2>,<model_link_2>
+... and so on
+```
+
+Then run: ```./run your_test_file.txt```
+Note: I just used the sample_input.txt from Piazza
+
 ## Contributors
 - Mikhail Golovenchits
 - Vatsal Dudhaiya
