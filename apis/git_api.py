@@ -77,6 +77,23 @@ def get_contributors(owner: str, repo: str) -> List[Dict[str, Any]]:
     return response.json()
 
 
+def get_commit_history(owner: str, repo: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve commits from a GitHub repository.
+    
+    Args:
+        owner (str): Repository owner (e.g., "octocat")
+        repo (str): Repository name (e.g., "hello-world")
+    
+    Returns:
+        list: A list of commit objects (dicts) from the GitHub API
+    """
+    headers = set_git_headers()
+    url = f"https://api.github.com/repos/{owner}/{repo}/commits"
+    response = make_request(url, headers)
+    return response.json()
+
+
 if __name__ == "__main__":
     # Sample Output
     owner = "ECE461ProjTeam"
@@ -85,3 +102,8 @@ if __name__ == "__main__":
     print("Contributors:")
     for contributor in contributers:
         print(f"Contributor: {contributor['login']} - Contributions: {contributor['contributions']}")
+    commits = get_commit_history(owner, repo)
+    print("\nCommits:")
+    for commit in commits:
+        print(f"Commit: {commit['sha']} - {commit['commit']['message']}")
+        print(f"Author: {commit['commit']['author']['name']} <{commit['commit']['author']['email']}>")
