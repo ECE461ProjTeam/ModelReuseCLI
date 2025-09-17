@@ -70,9 +70,9 @@ class Model:
             t.join()
     
     def calcSize(self) -> None:
-        t = time.time()
+        t = time.perf_counter()
         self.metrics["size_score"] = size_score(self.id)
-        self.latencies["size_score_latency"] = time.time() - t
+        self.latencies["size_score_latency"] = time.perf_counter() - t
 
     def calcRampUp(self) -> None:
         self.metrics["ramp_up_time"] = 1
