@@ -19,8 +19,11 @@ def bus_factor(owner: str, repo: str) -> float:
         float: The bus factor of the repository. [0-1]
     """
     contributors = git_api.get_contributors(owner, repo)
+    # Handle edge cases
     if not contributors:
         return 0
+    elif len(contributors) == 1:
+        return 1
 
     bus_factor = 0
     total_commits = sum(contributor['contributions'] for contributor in contributors)
