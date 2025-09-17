@@ -41,7 +41,22 @@ def bus_factor(owner: str, repo: str) -> float:
 
 # Testing only - remove upon integration
 if __name__ == "__main__":
+    # Case 1: Major open source repo
     owner = "freeCodeCamp"
     repo = "freeCodeCamp"
+    print(f"Bus Factor for {owner}/{repo}: {bus_factor(owner, repo)}")
 
+    # Case 2: Small open source repo (us)
+    owner = "ECE461ProjTeam"
+    repo = "ModelReuseCLI"
+    print(f"Bus Factor for {owner}/{repo}: {bus_factor(owner, repo)}")
+
+    # Case 3: Repo with 2 contributors
+    owner = "octocat"
+    repo = "Hello-World"
+    print(f"Bus Factor for {owner}/{repo}: {bus_factor(owner, repo)}")
+    
+    # Case 4: Repo with one contributor
+    owner = "vdudhaiy"
+    repo = "llmrec-570-copy"
     print(f"Bus Factor for {owner}/{repo}: {bus_factor(owner, repo)}")
