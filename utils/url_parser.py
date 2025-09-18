@@ -25,15 +25,15 @@ def classify_url(url: str) -> str:
     
     # GitHub patterns
     if re.search(r'github\.com', url, re.IGNORECASE):
-        return 'github'
+        return 'code'
     
     # HuggingFace dataset patterns
     if re.search(r'huggingface\.co/datasets/', url, re.IGNORECASE):
-        return 'huggingface_dataset'
+        return 'dataset'
     
     # HuggingFace model patterns
     if re.search(r'huggingface\.co/', url, re.IGNORECASE):
-        return 'huggingface_model'
+        return 'model'
     
     return 'unknown'
 
@@ -157,7 +157,7 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                 code = None
                 if code_link:
                     code_type = classify_url(code_link)
-                    if code_type == 'github':
+                    if code_type == 'code':
                         code = Code(code_link)
                         populate_code_info(code)
                     else:
@@ -167,7 +167,7 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                 dataset = None
                 if dataset_link:
                     dataset_type = classify_url(dataset_link)
-                    if dataset_type == 'huggingface_dataset':
+                    if dataset_type == 'dataset':
                         dataset = Dataset(dataset_link)
                         populate_dataset_info(dataset)
                         dataset_registry[dataset._name] = dataset  # Add to registry
@@ -180,7 +180,7 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                     continue
                 
                 model_type = classify_url(model_link)
-                if model_type != 'huggingface_model':
+                if model_type != 'model':
                     print(f"Warning: Model link on line {line_num} is not a HuggingFace model URL: {model_link}")
                     continue
                 
