@@ -16,7 +16,7 @@ def classify_url(url: str) -> str:
         url (str): The URL to classify
         
     Returns:
-        str: 'github', 'huggingface_dataset', 'huggingface_model', or 'unknown'
+        str: 'code', 'dataset', 'model', or 'unknown'
     """
     if not url or not url.strip():
         return 'unknown'
