@@ -5,7 +5,7 @@ Handles parsing URL files and creating Model, Code, Dataset objects
 
 import re
 from typing import List, Tuple, Dict
-from classes.model import Model, Code, Dataset
+from model import Model, Code, Dataset
 
 
 def classify_url(url: str) -> str:

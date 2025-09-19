@@ -3,6 +3,7 @@ import argparse
 import sys
 import os
 from typing import Dict
+import json
 
 from apis.gemini import prompt_gemini
 from apis.hf_client import HFClient, resolve_hf_token
@@ -59,12 +60,14 @@ def main():
             sys.exit(3)  # Specific error code for no models found
         
         # Print summary of parsed models
-        print_model_summary(models, dataset_registry)
+        # print_model_summary(models, dataset_registry)
         
-        print("\nURL parsing complete! Created:")
-        print(f"  - {len(models)} Model objects")
-        print(f"  - {len(dataset_registry)} unique datasets")
-        print("Objects ready for metric calculation teams.")
+        # print("\nURL parsing complete! Created:")
+        # print(f"  - {len(models)} Model objects")
+        # print(f"  - {len(dataset_registry)} unique datasets")
+        # print("Objects ready for metric calculation teams.")
+        for model in models:
+            print(json.dumps(model.evaluate(), indent=4))
 
 
 if __name__ == "__main__":

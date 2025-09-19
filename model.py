@@ -2,6 +2,7 @@ import threading
 import time
 from metrics.size_score import size_score
 import json
+from typing import Dict, Union
 class Code:
     def __init__(self, url: str) -> None:
         self._url = url
@@ -49,23 +50,48 @@ class Model:
         self.dataset = None  # instance of Dataset class
         self.metadata = {}
         self.metrics = {
+            "net_score": 0,
             "ramp_up_time": 0, 
             "bus_factor": 0, 
             "performance_claims": 0, 
             "license": 0, 
             "size_score": {
-                "raspberry_pi": 0.0,
-                "jetson_nano": 0.0,
-                "desktop_pc": 0.0,
-                "aws_server": 0.0
+                "raspberry_pi": 0,
+                "jetson_nano": 0,
+                "desktop_pc": 0,
+                "aws_server": 0
             }, 
             "dataset_and_code_score": 0, 
             "dataset_quality": 0, 
             "code_quality": 0
         }
-        self.netScore = 0.0
+        self.latencies = {
+            "net_score_latency": 0,
+            "ramp_up_time_latency": 0,
+            "bus_factor_latency": 0,
+            "performance_claims_latency": 0,
+            "license_latency": 0,
+            "size_score_latency": 0,
+            "dataset_and_code_score_latency": 0,
+            "dataset_quality_latency": 0,
+            "code_quality_latency": 0
+        }
         self.hfAPIData = {}
         self.gitAPIData = {}
+
+    # Evaluate model
+    def evaluate(self) -> Dict[str, Union[int, float, str, Dict[str, float]]]:
+        t = int(time.perf_counter_ns() / 1e6)
+        self.calcMetricsParallel()
+        self.calcNetScore()
+        self.latencies["net_score_latency"] = int(time.perf_counter_ns() / 1e6 - t)
+        res =  {
+            "name": self.id,
+            "category": "MODEL",
+        }
+        res.update(self.metrics)
+        res.update(self.latencies)
+        return res
 
     def calcMetricsParallel(self) -> None:
         threads = []
@@ -83,9 +109,10 @@ class Model:
             t.join()
     
     def calcSize(self) -> None:
-        t = time.perf_counter()
+        # Time in milliseconds
+        t = int(time.perf_counter_ns() / 1e6)
         self.metrics["size_score"] = size_score(self.id)
-        self.latencies["size_score_latency"] = time.perf_counter() - t
+        self.latencies["size_score_latency"] = int(time.perf_counter_ns() / 1e6 - t)
 
     def calcRampUp(self) -> None:
         self.metrics["ramp_up_time"] = 1
@@ -107,6 +134,20 @@ class Model:
 
     def calcCodeQuality(self) -> None:
         self.metrics["code_quality"] = 1
+
+    def calcNetScore(self) -> None:
+        self.metrics['net_score'] = 0.08 * (0.05 * self.metrics["size_score"]["raspberry_pi"] + \
+                                0.15 * self.metrics["size_score"]["jetson_nano"] + \
+                                0.3 * self.metrics["size_score"]["desktop_pc"] + \
+                                0.5 * self.metrics["size_score"]["aws_server"]) + \
+                        0.12 * self.metrics["license"] + \
+                        0.2 * self.metrics["ramp_up_time"] + \
+                        0.05 * self.metrics["bus_factor"] + \
+                        0.1 * self.metrics["dataset_and_code_score"] + \
+                        0.15 * self.metrics["dataset_quality"] + \
+                        0.1 * self.metrics["code_quality"] + \
+                        0.2 * self.metrics["performance_claims"]
+        self.metrics['net_score'] = round(self.metrics['net_score'], 2)
 
     def linkCode(self, code: Code):
         self.code = code

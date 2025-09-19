@@ -16,7 +16,7 @@ def size_score(model_id: str) -> Dict[str, float]:
     """
     client = HFClient()
     model_info = client.model_info(model_id)
-    if model_info['safetensors'] is None:
+    if 'safetensors' not in model_info.keys():
         return {plat: 0 for plat in PLATFORM_SIZE_LIMITS}
     parameters = model_info['safetensors'].total/1e9
     result = PLATFORM_SIZE_LIMITS
