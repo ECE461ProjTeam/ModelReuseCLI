@@ -56,6 +56,7 @@ class Model:
     def __init__(self, url: str = "", id: str = "") -> None:
         self.url = url
         self.id: str = id
+        self.name = ""
         self.code = None  # instance of Code class
         self.dataset = None  # instance of Dataset class
         self.metadata = {}
@@ -96,7 +97,7 @@ class Model:
         self.calcNetScore()
         self.latencies["net_score_latency"] = int(time.perf_counter_ns() / 1e6 - t)
         res =  {
-            "name": self.id,
+            "name": self.name,
             "category": "MODEL",
         }
         res.update(self.metrics)
@@ -106,12 +107,6 @@ class Model:
     def calcMetricsParallel(self) -> None:
         threads = []
         funcs = {
-<<<<<<< HEAD
-            "ramp_up_time": self.calcRampUp, "bus_factor": self.calcBusFactor,
-            "performance_claims": self.calcPerformanceClaims, "license": self.calcLicense,
-            "size_score": self.calcSize, "dataset_and_code_score": self.calcDatasetCode,
-            "dataset_quality": self.calcDatasetQuality, "code_quality": self.calcCodeQuality
-=======
             "ramp_up_time": self.calcRampUp,
             "bus_factor": self.calcBusFactor,
             "performance_claims": self.calcPerformanceClaims,
@@ -120,7 +115,6 @@ class Model:
             "dataset_and_code_score": self.calcDatasetCode,
             "dataset_quality": self.calcDatasetQuality,
             "code_quality": self.calcCodeQuality,
->>>>>>> main
         }
         for key in funcs:
             t = threading.Thread(target=funcs[key])

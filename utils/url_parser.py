@@ -6,6 +6,7 @@ Handles parsing URL files and creating Model, Code, Dataset objects
 import re
 from typing import List, Tuple, Dict
 from model import Model, Code, Dataset
+from apis.hf_client import HFClient
 
 
 def classify_url(url: str) -> str:
@@ -66,6 +67,28 @@ def extract_name_from_url(url: str) -> str:
     return ""
 
 
+def extract_id_from_url(url: str) -> str:
+    """
+    Extract a full ID from a HuggingFace URL
+    
+    Args:
+        url (str): The URL
+        
+    Returns:
+        str: Extracted ID or empty string if extraction fails
+    """
+    if not url:
+        return ""
+    
+    # HuggingFace pattern: extract model/dataset ID 
+    # Handle both formats: namespace/model and standalone model names
+    hf_match = re.search(r'huggingface\.co/(?:datasets/)?([^/?]+(?:/[^/?]+)?)', url, re.IGNORECASE)
+    if hf_match:
+        return hf_match.group(1)
+    
+    return ""
+
+
 def populate_code_info(code: Code) -> None:
     """
     Populate Code object with additional information from GitHub API
@@ -112,8 +135,9 @@ def populate_model_info(model: Model) -> None:
     Args:
         model (Model): Model object to populate
     """
-    # Extract name from URL
+    # Extract name and ID from URL
     model.name = extract_name_from_url(model.url)
+    model.id = extract_id_from_url(model.url)
     # TODO: Add HuggingFace API calls to populate hfAPIData
     # Example implementation for metrics teams:
     # from apis.hf_client import HFClient
@@ -137,6 +161,8 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
     """
     models = []
     dataset_registry = {}  # Track all datasets by name
+    models_to_check = []   # Models with blank dataset fields
+    hf_client = HFClient() # Create a single client instance
     
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -194,8 +220,66 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                 
                 if dataset:
                     model.linkDataset(dataset)
+                else:
+                    # If no dataset, add to the list to check later
+                    models_to_check.append(model)
                 
                 models.append(model)
+
+        # After parsing, process models with missing datasets
+        if models_to_check and dataset_registry:
+            print("\nChecking models for dataset links...")
+            for model in models_to_check:
+                if not model.id:
+                    continue
+                
+                # Collect all datasets mentioned in model metadata
+                all_datasets_found = []
+                model_info = hf_client.model_info(model.id)
+                
+                # Check cardData.datasets field
+                if model_info.get('cardData') and hasattr(model_info['cardData'], 'datasets'):
+                    card_datasets = model_info['cardData'].datasets or []
+                    all_datasets_found.extend(card_datasets)
+                
+                # Check tags for dataset entries
+                if model_info.get('tags'):
+                    for tag in model_info['tags']:
+                        if tag.startswith('dataset:'):
+                            all_datasets_found.append(tag[8:])
+                
+                # Check model card text for dataset mentions
+                model_card = hf_client.model_card_text(model.id)
+                if model_card:
+                    for name in dataset_registry.keys():
+                        if re.search(r'\b' + re.escape(name) + r'\b', model_card, re.IGNORECASE):
+                            all_datasets_found.append(name)
+                
+                # Remove duplicates while preserving order
+                unique_datasets = []
+                for dataset in all_datasets_found:
+                    if dataset not in unique_datasets:
+                        unique_datasets.append(dataset)
+                
+                # Find the first dataset that exists in our registry
+                valid_datasets = [ds for ds in unique_datasets if ds in dataset_registry]
+                
+                if valid_datasets:
+                    chosen_dataset = valid_datasets[0]
+                    print(f"  Model '{model.id}' mentions datasets: {unique_datasets}")
+                    if len(valid_datasets) > 1:
+                        print(f"  Multiple valid datasets found: {valid_datasets}")
+                        print(f"  Linking to first valid dataset: '{chosen_dataset}'")
+                    else:
+                        print(f"  Linking to dataset: '{chosen_dataset}'")
+                    model.linkDataset(dataset_registry[chosen_dataset])
+                else:
+                    if unique_datasets:
+                        print(f"  Model '{model.id}' mentions datasets: {unique_datasets}")
+                        print(f"  No mentioned datasets found in registry")
+                    else:
+                        print(f"  No datasets found in metadata for model '{model.id}'")
+                
                 
     except FileNotFoundError:
         print(f"Error: File {file_path} not found")

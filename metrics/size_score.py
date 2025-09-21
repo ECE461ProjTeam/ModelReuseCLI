@@ -16,7 +16,9 @@ def size_score(model_id: str) -> Dict[str, float]:
     """
     client = HFClient()
     model_info = client.model_info(model_id)
-    if 'safetensors' not in model_info.keys():
+    # if 'safetensors' not in model_info.keys():
+    #     return {plat: 0 for plat in PLATFORM_SIZE_LIMITS}
+    if 'safetensors' not in model_info or model_info['safetensors'] is None or model_info['safetensors'].total is None:
         return {plat: 0 for plat in PLATFORM_SIZE_LIMITS}
     parameters = model_info['safetensors'].total/1e9
     result = PLATFORM_SIZE_LIMITS
@@ -33,3 +35,8 @@ if __name__ == "__main__":
     model_id = "deepseek-ai/DeepSeek-R1"
     score = size_score(model_id)
     print(score)
+
+    # Test case for a model with safetensors=None
+    model_id = "facebook/blenderbot-400M-distill"
+    score = size_score(model_id)
+    print(f"Score for model with no safetensors ({model_id}): {score}")
