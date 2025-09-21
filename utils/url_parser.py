@@ -1,12 +1,8 @@
-"""
-URL Parser for ModelReuseCLI
-Handles parsing URL files and creating Model, Code, Dataset objects
-"""
-
 import re
 from typing import List, Tuple, Dict
 from model import Model, Code, Dataset
 from apis.hf_client import HFClient
+from apis.gemini import get_gemini_key, prompt_gemini
 
 
 def classify_url(url: str) -> str:
@@ -50,41 +46,102 @@ def extract_name_from_url(url: str) -> str:
         str: Extracted name or empty string if extraction fails
     """
     if not url:
-        return ""
+        return "", ""
     
     # GitHub pattern: extract repo name
     github_match = re.search(r'github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/.*)?$', url, re.IGNORECASE)
     if github_match:
         owner, repo = github_match.groups()
-        return repo.replace('.git', '')
+        return owner, repo.replace('.git', '')
     
     # HuggingFace pattern: extract model/dataset name
     hf_match = re.search(r'huggingface\.co/(?:datasets/)?([^/]+)/([^/]+?)(?:/.*)?$', url, re.IGNORECASE)
     if hf_match:
         namespace, name = hf_match.groups()
-        return name
-    
-    return ""
+        return namespace, name
+
+    return "", ""
 
 
-def extract_id_from_url(url: str) -> str:
+def find_best_dataset_with_gemini(model_id: str, model_card: str, dataset_registry: Dict[str, Dataset]) -> str:
     """
-    Extract a full ID from a HuggingFace URL
+    Use Gemini to intelligently find the most relevant dataset for a model from the entire registry
     
     Args:
-        url (str): The URL
-        
+        model_id (str): The model ID
+        model_card (str): The model card text
+        dataset_registry (Dict[str, Dataset]): Registry of all available datasets
+    
     Returns:
-        str: Extracted ID or empty string if extraction fails
+        str: The name of the most relevant dataset, or empty string if none found
     """
-    if not url:
+    if not dataset_registry:
         return ""
     
-    # HuggingFace pattern: extract model/dataset ID 
-    # Handle both formats: namespace/model and standalone model names
-    hf_match = re.search(r'huggingface\.co/(?:datasets/)?([^/?]+(?:/[^/?]+)?)', url, re.IGNORECASE)
-    if hf_match:
-        return hf_match.group(1)
+    # Get Gemini API key
+    api_key = get_gemini_key()
+    if not api_key:
+        print(f"  Warning: No Gemini API key found, cannot analyze datasets")
+        return ""
+    
+    # Create dataset descriptions for Gemini
+    dataset_descriptions = []
+    for dataset_name, dataset_obj in dataset_registry.items():
+        dataset_url = dataset_obj._url
+        dataset_descriptions.append(f"- {dataset_name}: {dataset_url}")
+    
+    # Create prompt for Gemini with confidence scoring
+    prompt = f"""You are helping to match machine learning models with their most relevant training datasets.
+
+Model ID: {model_id}
+
+Model Description (from hugging face model card):
+{model_card[:10000] if model_card else "No model card available"}
+
+Available datasets in registry:
+{chr(10).join(dataset_descriptions)}
+
+Task: Analyze the model description and determine which dataset from the registry would be most likely used for training or fine-tuning this model. Consider:
+1. The model's purpose and intended use case
+2. The type of task (text classification, language modeling, etc.)
+3. Domain relevance (sentiment analysis, question answering, etc.)
+4. Which dataset would make the most sense for this specific model
+
+If you find a relevant dataset from the list that you are reasonably confident about (6+ out of 10 confidence), respond with ONLY the dataset name (e.g., "glue" or "bookcorpus").
+If no dataset from the list seems relevant or you are not confident enough, respond with exactly: "NONE"
+
+Response:"""
+
+    try:
+        response = prompt_gemini(prompt, api_key)
+        if response:
+            # Clean the response
+            cleaned_response = response.strip().lower().replace('"', '').replace("'", "")
+            
+            # Check if Gemini said no relevant dataset
+            if "none" in cleaned_response:
+                # print(f"  Gemini found no relevant dataset in registry")
+                return ""
+            
+            # Check for exact match first
+            for dataset_name in dataset_registry.keys():
+                if dataset_name.lower() == cleaned_response:
+                    # print(f"  Gemini selected: '{dataset_name}' (exact match)")
+                    return dataset_name
+            
+            # Check for partial matches (dataset name found in Gemini's response)
+            for dataset_name in dataset_registry.keys():
+                if dataset_name.lower() in cleaned_response:
+                    # print(f"  Gemini selected: '{dataset_name}' (partial match)")
+                    return dataset_name
+            
+            # print(f"  Gemini response '{cleaned_response}' not recognized in registry")
+        else:
+            # print(f"  Gemini request failed")
+            pass
+    except Exception as e:
+        print(f"  Error with Gemini analysis: {e}")
+        pass
     
     return ""
 
@@ -97,7 +154,8 @@ def populate_code_info(code: Code) -> None:
         code (Code): Code object to populate
     """
     # Extract name from URL
-    code._name = extract_name_from_url(code._url)
+    owner, name = extract_name_from_url(code._url)
+    code._name = name
     # TODO: Add GitHub API calls to populate metadata
     # Example implementation for metrics teams:
     # from apis.git_api import get_contributors, get_commit_history
@@ -117,7 +175,8 @@ def populate_dataset_info(dataset: Dataset) -> None:
         dataset (Dataset): Dataset object to populate
     """
     # Extract name from URL
-    dataset._name = extract_name_from_url(dataset._url)
+    owner, name = extract_name_from_url(dataset._url)
+    dataset._name = name
     # TODO: Add HuggingFace API calls to populate metadata
     # Example implementation for metrics teams:
     # from apis.hf_client import HFClient
@@ -136,8 +195,8 @@ def populate_model_info(model: Model) -> None:
         model (Model): Model object to populate
     """
     # Extract name and ID from URL
-    model.name = extract_name_from_url(model.url)
-    model.id = extract_id_from_url(model.url)
+    owner, model.name = extract_name_from_url(model.url)
+    model.id = owner + "/" + model.name
     # TODO: Add HuggingFace API calls to populate hfAPIData
     # Example implementation for metrics teams:
     # from apis.hf_client import HFClient
@@ -226,59 +285,28 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                 
                 models.append(model)
 
-        # After parsing, process models with missing datasets
+        # After parsing, process models with missing datasets using Gemini
         if models_to_check and dataset_registry:
-            print("\nChecking models for dataset links...")
+            # print(f"\nUsing Gemini to find relevant datasets for {len(models_to_check)} models...")
             for model in models_to_check:
                 if not model.id:
+                    # print(f"  Skipping model with no ID")
                     continue
                 
-                # Collect all datasets mentioned in model metadata
-                all_datasets_found = []
-                model_info = hf_client.model_info(model.id)
+                # print(f"  Analyzing model '{model.id}'...")
                 
-                # Check cardData.datasets field
-                if model_info.get('cardData') and hasattr(model_info['cardData'], 'datasets'):
-                    card_datasets = model_info['cardData'].datasets or []
-                    all_datasets_found.extend(card_datasets)
-                
-                # Check tags for dataset entries
-                if model_info.get('tags'):
-                    for tag in model_info['tags']:
-                        if tag.startswith('dataset:'):
-                            all_datasets_found.append(tag[8:])
-                
-                # Check model card text for dataset mentions
+                # Get model card for analysis
                 model_card = hf_client.model_card_text(model.id)
-                if model_card:
-                    for name in dataset_registry.keys():
-                        if re.search(r'\b' + re.escape(name) + r'\b', model_card, re.IGNORECASE):
-                            all_datasets_found.append(name)
                 
-                # Remove duplicates while preserving order
-                unique_datasets = []
-                for dataset in all_datasets_found:
-                    if dataset not in unique_datasets:
-                        unique_datasets.append(dataset)
+                # Use Gemini to find the best dataset from our registry
+                chosen_dataset = find_best_dataset_with_gemini(model.id, model_card, dataset_registry)
                 
-                # Find the first dataset that exists in our registry
-                valid_datasets = [ds for ds in unique_datasets if ds in dataset_registry]
-                
-                if valid_datasets:
-                    chosen_dataset = valid_datasets[0]
-                    print(f"  Model '{model.id}' mentions datasets: {unique_datasets}")
-                    if len(valid_datasets) > 1:
-                        print(f"  Multiple valid datasets found: {valid_datasets}")
-                        print(f"  Linking to first valid dataset: '{chosen_dataset}'")
-                    else:
-                        print(f"  Linking to dataset: '{chosen_dataset}'")
+                if chosen_dataset:
+                    # print(f"  Linking '{model.id}' to dataset: '{chosen_dataset}'")
                     model.linkDataset(dataset_registry[chosen_dataset])
                 else:
-                    if unique_datasets:
-                        print(f"  Model '{model.id}' mentions datasets: {unique_datasets}")
-                        print(f"  No mentioned datasets found in registry")
-                    else:
-                        print(f"  No datasets found in metadata for model '{model.id}'")
+                    # print(f"  No relevant dataset found for '{model.id}'")
+                    pass
                 
                 
     except FileNotFoundError:
