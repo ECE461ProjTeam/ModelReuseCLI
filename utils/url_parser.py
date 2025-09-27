@@ -8,8 +8,10 @@ from typing import List, Tuple, Dict
 from model import Model, Code, Dataset
 import logging
 
-
 logger = logging.getLogger('cli_logger')
+
+import apis.hf_client as hf_client
+
 
 
 def classify_url(url: str) -> str:
@@ -164,6 +166,7 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
         Tuple[List[Model], Dict[str, Dataset]]: List of Model objects and dataset registry
     """
     models = []
+    models_to_check = []  # Models with empty dataset links
     dataset_registry = {}  # Track all datasets by name
     
     try:
@@ -225,8 +228,43 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
                 
                 if dataset:
                     model.linkDataset(dataset)
+                else:
+                    # If no dataset, add to the list to check later
+                    models_to_check.append(model)
                 
                 models.append(model)
+
+
+        # After parsing, process models with missing datasets using Gemini
+        if models_to_check and dataset_registry:
+            logger.debug(f"Checking empty dataset link for {len(models_to_check)} models...")
+            for model in models_to_check:
+                if not model.id:
+                    logger.debug(f"  Skipping model with no ID")
+                    continue
+            
+            # Debug: Print dataset registry contents
+            logger.debug(f"Dataset registry contains {len(dataset_registry)} datasets:")
+            for registry_key, dataset_obj in dataset_registry.items():
+                logger.debug(f"  Registry key: '{registry_key}' -> URL: {dataset_obj._url}")
+            
+            for model in models_to_check:
+                if not model.id:
+                    logger.debug(f"  Skipping model with no ID")
+                    continue
+
+                logger.debug(f"  Analyzing model '{model.id}'...")
+                model_card = hf_client.HFClient().model_card_text(model.id)
+                
+                chosen_dataset = find_empty_dataset(model.id, model_card, dataset_registry)
+                
+                if chosen_dataset:
+                    logger.debug(f"  Linking '{model.id}' to dataset: '{chosen_dataset}'")
+                    model.linkDataset(dataset_registry[chosen_dataset])
+                else:
+                    logger.debug(f"  No relevant dataset found for '{model.id}'")
+                    pass
+                
                 
     except FileNotFoundError:
         logger.error(f"Error: File {file_path} not found")
@@ -236,6 +274,100 @@ def parse_URL_file(file_path: str) -> Tuple[List[Model], Dict[str, Dataset]]:
         return [], {}
     
     return models, dataset_registry
+
+
+def find_empty_dataset(model_id: str, model_card: str, dataset_registry: Dict[str, Dataset]) -> str:    
+    """
+    Use model ID and model card text to find a relevant dataset from the registry
+    
+    Args:
+        model_id (str): Model identifier
+        model_card (str): Model card text
+        dataset_registry (Dict[str, Dataset]): Registry of all datasets
+
+    Returns:
+        str: The name of the chosen dataset, or an empty string if none found
+    """
+    
+    if not dataset_registry:
+        return ""
+
+    training_data_section = extract_training_data_section(model_card)
+    logger.debug(f"  Training data section found: {bool(training_data_section)}")
+    if training_data_section:
+        logger.debug(f"  Training data content (first 300 chars): '{training_data_section[:300]}'")
+
+    if not training_data_section:
+        return ""
+
+    # Check for placeholder text that indicates no real training data info
+    training_data_lower = training_data_section.lower().strip()
+    if (training_data_lower.startswith("[more information needed]") or 
+        training_data_lower.startswith("<!-- this should link to a dataset")):
+        logger.debug(f"  Training data section contains placeholder text, skipping LLM analysis")
+        return ""
+
+    from utils.prompt_key import get_prompt_key
+    api_keys = get_prompt_key()
+    
+    if "purdue_genai" in api_keys:
+        # Use Purdue GenAI
+        from apis.purdue_genai import prompt_purdue_genai
+        
+        available_datasets = list(dataset_registry.keys())
+        
+        prompt = f"""Match training data to dataset. Return only the exact dataset name or "NONE".
+
+Available datasets: {', '.join(available_datasets)}
+
+Training data: {training_data_section[:500]}
+
+Return format: Just the dataset name (e.g., "bookcorpus/bookcorpus") or "NONE". No explanation."""
+
+        logger.debug("Sending training data section to LLM...")
+        try:
+            response = prompt_purdue_genai(prompt, api_keys["purdue_genai"])
+            response = response.strip()
+            
+            # Check if response matches any dataset in registry
+            if response in available_datasets or response in dataset_registry:
+                logger.debug(f"  Purdue GenAI matched '{model_id}' to dataset: '{response}'")
+                return response
+            
+            # Try fuzzy matching for cases like "bookcorpus" -> "bookcorpus/bookcorpus"
+            for registry_key in available_datasets:
+                if '/' in registry_key:
+                    dataset_part = registry_key.split('/')[-1]
+                    if response.lower() == dataset_part.lower():
+                        logger.debug(f"  Purdue GenAI fuzzy matched '{response}' to '{registry_key}'")
+                        return registry_key
+            
+            logger.debug(f"  Purdue GenAI response '{response}' not in registry")
+            
+        except Exception as e:
+            logger.error(f"  Error calling Purdue GenAI: {e}")
+
+    return ""
+
+
+def extract_training_data_section(model_card: str) -> str:
+    """
+    Extract the 'Training data' section from a model card.
+
+    Args:
+        model_card (str): The full text of the model card.
+
+    Returns:
+        str: The content of the 'Training data' section, or an empty string if not found.
+    """
+    import re 
+
+    # Locate the "Training data" section
+    training_data_match = re.search(r"## Training data\n\n(.+?)(\n##|\Z)", model_card, re.DOTALL | re.IGNORECASE)
+    if training_data_match:
+        return training_data_match.group(1).strip()
+
+    return ""
 
 
 def print_model_summary(models: List[Model], dataset_registry: Dict[str, Dataset]) -> None:
@@ -260,24 +392,33 @@ def print_model_summary(models: List[Model], dataset_registry: Dict[str, Dataset
 
 
 # if __name__ == "__main__":
-#     # Test the URL parser
-#     # Note: Run this from the project root directory: python3 -m utils.url_parser
-#     test_content = """https://github.com/google-research/bert,https://huggingface.co/datasets/bookcorpus/bookcorpus,https://huggingface.co/google-bert/bert-base-uncased
-# ,,https://huggingface.co/parvk11/audience_classifier_model
-# ,,https://huggingface.co/openai/whisper-tiny"""
-    
-#     with open("test_input.txt", "w") as f:
-#         f.write(test_content)
-    
-#     print("Testing URL parser standalone...")
-#     try:
-#         models, dataset_registry = parse_URL_file("test_input.txt")
-#         print_model_summary(models, dataset_registry)
-#     except Exception as e:
-#         print(f"Test failed: {e}")
-#         print("Note: Run with 'python3 -m utils.url_parser' from project root")
-#     finally:
-#         # Clean up test file
-#         import os
-#         if os.path.exists("test_input.txt"):
-#             os.remove("test_input.txt")
+#     # Test the URL parser with a model that has an empty dataset link
+#     logger.debug("Testing URL parser with dataset population logic...")
+
+#     # Create a dataset registry with a known dataset
+#     dataset_registry = {
+#         "bookcorpus/bookcorpus": Dataset("https://huggingface.co/datasets/bookcorpus/bookcorpus")
+#     }
+#     populate_dataset_info(dataset_registry["bookcorpus/bookcorpus"])
+
+#     # Create a model with an empty dataset link
+#     model = Model("https://huggingface.co/google-bert/bert-base-uncased")
+#     populate_model_info(model)
+
+#     # Simulate a model card with training data mentioning "BookCorpus"
+#     model_card_text = """
+#     ## Training data
+
+#     The model was trained on the BookCorpus dataset and other datasets.
+#     """
+
+#     # Use the find_empty_dataset logic to populate the dataset link
+#     chosen_dataset = find_empty_dataset(model.id, model_card_text, dataset_registry)
+#     if chosen_dataset:
+#         logger.debug(f"Dataset chosen for model {model.id}: {chosen_dataset}")
+#         model.linkDataset(dataset_registry[chosen_dataset])
+#     else:
+#         logger.debug(f"No dataset found for model {model.id}")
+
+#     # Print the results
+#     print_model_summary([model], dataset_registry)
