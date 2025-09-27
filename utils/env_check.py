@@ -18,7 +18,7 @@ def check_environment() -> bool:
     log_file_path = os.getenv("LOG_FILE")
     
     # 1. Check if log file path exists
-    if not log_file_path or not os.path.isfile(log_file_path):
+    if not log_file_path:
         return False
 
     if not git_token:
