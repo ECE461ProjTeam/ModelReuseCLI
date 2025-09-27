@@ -9,6 +9,7 @@ def dataset_and_code_score(dataset_id: str, code_id: str, code_type: str) -> flo
     headers = set_git_headers()
     
     score = 0
+    code_files = []
     
     if (dataset_id):
         score += 0.125

@@ -31,3 +31,4 @@ class ModelInterfaceTests(BaseCLITestCase):
             "size_score", "dataset_and_code_score", "dataset_quality", "code_quality",
         }
         self.assertTrue(expected.issubset(set(self.model.metrics.keys())))
+
