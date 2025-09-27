@@ -182,7 +182,7 @@ class Model:
     def calcDatasetQuality(self) -> None:
         t = int(time.perf_counter_ns() / 1e6)
         if self.dataset:
-            self.metrics["dataset_quality"] = compute_dataset_quality(self.dataset._name)
+            self.metrics["dataset_quality"] = compute_dataset_quality(self.dataset._url)
         else:
             self.metrics["dataset_quality"] = 0
         self.latencies["dataset_quality_latency"] = int(time.perf_counter_ns() / 1e6 - t)
